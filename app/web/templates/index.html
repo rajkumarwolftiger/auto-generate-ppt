@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Auto PPT Generator</title>
+  <style>
+    body { font-family: sans-serif; margin: 30px; max-width: 900px; }
+    textarea, input, select { width: 100%; margin-bottom: 15px; padding: 8px; }
+    button {
+      padding: 10px 20px;
+      border: none;
+      background: #4CAF50;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button:hover { background: #45a049; }
+    #preview {
+      margin-top: 25px;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #f9f9f9;
+    }
+    .slide {
+      margin-bottom: 20px;
+    }
+    .slide h3 {
+      margin: 0 0 5px;
+      color: #2c3e50;
+    }
+    .slide ul { margin: 0; padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Auto PPT Generator</h1>
+
+  <form id="form" enctype="multipart/form-data">
+    <label>Paste or type your text</label>
+    <textarea name="input_text" rows="10" placeholder="Paste text here..."></textarea>
+
+    <label>Tone / Use Case (optional)</label>
+    <input name="tone_hint" placeholder="e.g. Investor Pitch"/>
+
+    <label>Upload PPTX Template Sample</label>
+    <input type="file" name="file" accept=".pptx,.potx" required/>
+
+    <label><input type="checkbox" name="add_notes"/>Please check the box for Add Speaker Notes</label><br><br>
+
+    <!-- Important: preview button must be type="button" -->
+    <button type="button" id="previewBtn">🔍 Preview Slides</button>
+    <button type="submit">⬇️ Generate PPTX</button>
+  </form>
+
+  <div id="preview"></div>
+
+  <script>
+    // Preview handler
+    document.getElementById("previewBtn").addEventListener("click", async () => {
+      const form = document.getElementById("form");
+      const data = new FormData(form);
+
+      const res = await fetch("/preview", { method: "POST", body: data });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert("❌ Preview error: " + (err.error || res.statusText));
+        return;
+      }
+
+      const json = await res.json();
+      const slides = json.slides || [];
+      const preview = document.getElementById("preview");
+      preview.innerHTML = "<h2>Slide Preview</h2>";
+
+      slides.forEach(s => {
+        const div = document.createElement("div");
+        div.className = "slide";
+        div.innerHTML = `<h3>${s.title}</h3><ul>` +
+          (s.bullets ? s.bullets.map(b => `<li>${b}</li>`).join("") : "") +
+          `</ul>`;
+        preview.appendChild(div);
+      });
+    });
+
+    // PPTX generation handler
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data = new FormData(e.target);
+      const res = await fetch("/generate", { method: "POST", body: data });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert("❌ Error generating PPT: " + (err.error || res.statusText));
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "generated.pptx";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
