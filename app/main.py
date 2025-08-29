@@ -11,26 +11,39 @@ from app.services.llm import generate_slide_plan, refine_slide_bullets, maybe_no
 from app.services.text_mapper import map_text_to_sections
 from app.services.pptx_builder import build_presentation
 
-# ✅ Load .env before anything else
+# ✅ Load .env first
 load_dotenv()
 
-app = FastAPI()
+# ----------- App Setup ------------
+app = FastAPI(title="Auto PPT Generator")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+    allow_origins=["*"],  # loosen later if needed
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
+# ✅ Ensure folders exist
+STATIC_DIR = "app/web/static"
+TEMPLATE_DIR = "app/web/templates"
+OUTPUT_DIR = "data/output"
+
+os.makedirs(STATIC_DIR, exist_ok=True)
+os.makedirs(TEMPLATE_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 # Mount static + templates
-app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
-templates = Jinja2Templates(directory="app/web/templates")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
 # ----------- Serve Web UI ----------
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
+    """Serve homepage"""
     return templates.TemplateResponse("index.html", {"request": request})
 
-# ----------- API to generate PPT ----------
+# ----------- API: Generate PPT ----------
 @app.post("/generate")
 async def generate(
     request: Request,
@@ -49,39 +62,37 @@ async def generate(
         with open(template_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
-        # 1. Map and split text
+        # Step 1: Break input into sections
         sections = map_text_to_sections(input_text, tone_hint)
 
-        # 2. Generate slides (using AIpipe key)
+        # Step 2: Generate slides
         plan = generate_slide_plan(sections, tone=tone_hint)
         slides = [refine_slide_bullets(s, tone=tone_hint) for s in plan]
 
-        # 3. Optional notes
+        # Step 3: Optional speaker notes
         notes = maybe_notes(slides) if add_notes else None
 
-        # 4. Build presentation
+        # Step 4: Build final PPTX
         out_name = f"auto_{uuid.uuid4().hex[:8]}.pptx"
-        out_path = os.path.join("data", "output", out_name)
-        os.makedirs(os.path.dirname(out_path), exist_ok=True)
-
+        out_path = os.path.join(OUTPUT_DIR, out_name)
         build_presentation(template_path, slides, notes, out_path)
 
-        return FileResponse(out_path, filename=out_name,
-            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+        return FileResponse(
+            out_path,
+            filename=out_name,
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
 
     except Exception as e:
-        # ✅ Print detailed error to logs + return message to frontend
         print("❌ Backend Error:", e)
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"error": str(e)})
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
+# ----------- API: Preview Slides ----------
 @app.post("/preview")
-async def preview(
-    input_text: str = Form(...),
-    tone_hint: str = Form("")
-):
+async def preview(input_text: str = Form(...), tone_hint: str = Form("")):
     try:
         sections = map_text_to_sections(input_text, tone_hint)
         plan = generate_slide_plan(sections, tone=tone_hint)

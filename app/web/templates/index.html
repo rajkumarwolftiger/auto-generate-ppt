@@ -1,105 +1,93 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="UTF-8" />
   <title>Auto PPT Generator</title>
-  <style>
-    body { font-family: sans-serif; margin: 30px; max-width: 900px; }
-    textarea, input, select { width: 100%; margin-bottom: 15px; padding: 8px; }
-    button {
-      padding: 10px 20px;
-      border: none;
-      background: #4CAF50;
-      color: white;
-      border-radius: 6px;
-      cursor: pointer;
-      margin-right: 10px;
-    }
-    button:hover { background: #45a049; }
-    #preview {
-      margin-top: 25px;
-      padding: 15px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      background: #f9f9f9;
-    }
-    .slide {
-      margin-bottom: 20px;
-    }
-    .slide h3 {
-      margin: 0 0 5px;
-      color: #2c3e50;
-    }
-    .slide ul { margin: 0; padding-left: 20px; }
-  </style>
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <h1>Auto PPT Generator</h1>
+  <div class="overlay">
+    <h1>Auto PPT Generator</h1>
 
-  <form id="form" enctype="multipart/form-data">
-    <label>Paste or type your text</label>
-    <textarea name="input_text" rows="10" placeholder="Paste text here..."></textarea>
+    <form id="pptForm" enctype="multipart/form-data">
+      <label>Paste or type your text</label>
+      <textarea name="input_text" rows="8" required></textarea>
 
-    <label>Tone / Use Case (optional)</label>
-    <input name="tone_hint" placeholder="e.g. Investor Pitch"/>
+      <label>Tone / Use Case (optional)</label>
+      <input type="text" name="tone_hint" placeholder="Investor Pitch, Classroom Lecture, etc." />
 
-    <label>Upload PPTX Template Sample</label>
-    <input type="file" name="file" accept=".pptx,.potx" required/>
+      <label>Upload PPTX Template</label>
+      <input type="file" name="file" accept=".pptx,.potx" required />
 
-    <label><input type="checkbox" name="add_notes"/>Please check the box for Add Speaker Notes</label><br><br>
+      <label>
+        <input type="checkbox" name="add_notes" /> Add Speaker Notes
+      </label>
 
-    <!-- Important: preview button must be type="button" -->
-    <button type="button" id="previewBtn">🔍 Preview Slides</button>
-    <button type="submit">⬇️ Generate PPTX</button>
-  </form>
+      <button type="submit">Generate PPTX</button>
+    </form>
 
-  <div id="preview"></div>
+    <button id="previewBtn" class="preview-btn">Preview Slides</button>
+
+    <div id="previewArea"></div>
+  </div>
 
   <script>
-    // Preview handler
-    document.getElementById("previewBtn").addEventListener("click", async () => {
-      const form = document.getElementById("form");
-      const data = new FormData(form);
+    const form = document.getElementById("pptForm");
+    const previewBtn = document.getElementById("previewBtn");
+    const previewArea = document.getElementById("previewArea");
 
-      const res = await fetch("/preview", { method: "POST", body: data });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert("❌ Preview error: " + (err.error || res.statusText));
-        return;
+    // -------- Generate PPTX --------
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+
+      const res = await fetch("/generate", { method: "POST", body: formData });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "generated.pptx";
+        a.click();
+      } else {
+        const err = await res.json();
+        alert("❌ Error generating PPT: " + (err.error || res.statusText));
       }
-
-      const json = await res.json();
-      const slides = json.slides || [];
-      const preview = document.getElementById("preview");
-      preview.innerHTML = "<h2>Slide Preview</h2>";
-
-      slides.forEach(s => {
-        const div = document.createElement("div");
-        div.className = "slide";
-        div.innerHTML = `<h3>${s.title}</h3><ul>` +
-          (s.bullets ? s.bullets.map(b => `<li>${b}</li>`).join("") : "") +
-          `</ul>`;
-        preview.appendChild(div);
-      });
     });
 
-    // PPTX generation handler
-    document.getElementById("form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const data = new FormData(e.target);
-      const res = await fetch("/generate", { method: "POST", body: data });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert("❌ Error generating PPT: " + (err.error || res.statusText));
-        return;
+    // -------- Preview Slides --------
+    previewBtn.addEventListener("click", async () => {
+      const formData = new FormData(form);
+
+      const res = await fetch("/preview", { method: "POST", body: formData });
+      previewArea.innerHTML = "";
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.slides && data.slides.length) {
+          data.slides.forEach((slide) => {
+            const div = document.createElement("div");
+            div.className = "slide";
+            div.innerHTML = `<h3>${slide.title || "Untitled Slide"}</h3>`;
+            if (slide.bullets && slide.bullets.length) {
+              const ul = document.createElement("ul");
+              slide.bullets.forEach(b => {
+                const li = document.createElement("li");
+                li.textContent = b;
+                ul.appendChild(li);
+              });
+              div.appendChild(ul);
+            }
+            previewArea.appendChild(div);
+          });
+        } else {
+          previewArea.innerHTML = "<p>No slides generated.</p>";
+        }
+      } else {
+        const err = await res.json();
+        previewArea.innerHTML = `<p style="color:red;">❌ Preview failed: ${err.error || res.statusText}</p>`;
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "generated.pptx";
-      a.click();
-      URL.revokeObjectURL(url);
     });
   </script>
 </body>

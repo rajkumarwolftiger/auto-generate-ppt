@@ -1,0 +1,89 @@
+/* Transparent background image + fallback color */
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  margin: 0;
+  background: #f4f6f8 url("/static/bg.jpg") no-repeat center center fixed;
+  background-size: cover;
+  min-height: 100vh;
+}
+
+/* Semi-transparent overlay so text is readable */
+.overlay {
+  background: rgba(255, 255, 255, 0.85);
+  padding: 2rem;
+  min-height: 100vh;
+}
+
+/* Headings */
+h1 {
+  color: #2c3e50;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+/* Form styling */
+form {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+textarea, input, button {
+  width: 100%;
+  padding: 10px;
+  margin: 8px 0;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+button {
+  cursor: pointer;
+  background: #2980b9;
+  color: white;
+  border: none;
+  font-size: 1rem;
+}
+
+button:hover { background: #1f6391; }
+
+.preview-btn {
+  margin-top: 15px;
+  background: #27ae60;
+}
+
+#previewArea {
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+/* Slide Preview Cards */
+.slide {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  padding: 25px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.slide h3 {
+  font-size: 1.6rem;
+  margin-bottom: 15px;
+  text-align: center;
+  color: #2c3e50;
+}
+
+.slide ul {
+  list-style-type: disc;
+  padding-left: 25px;
+}
+
+.slide li {
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
